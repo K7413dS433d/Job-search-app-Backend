@@ -4,7 +4,7 @@ bearerKey = localStorage.getItem("token");
 const clientIo = io(baseUrl, { auth: { authorization: bearerKey } });
 const button = document.getElementById("btn");
 
-clientIo.on("connect", () => console.log("connection stablished"));
+clientIo.on("connect", () => console.log("connection established"));
 
 clientIo.on("socket_error", (message) => {
   window.alert(message);

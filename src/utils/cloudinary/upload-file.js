@@ -28,7 +28,8 @@ export const uploadFile = async ({ req, options: { folder, fileName } }) => {
     uploadOptions
   );
 
-  //save in req for error handling
+  //catch images to delete from the cloud if there is an error
+  //!related to global error handling file
   req.images = { secure_url, public_id };
 
   return { secure_url, public_id };

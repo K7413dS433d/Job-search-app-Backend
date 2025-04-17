@@ -1,6 +1,7 @@
 import express from "express";
 import bootstrap from "./src/app.controller.js";
 import setupSockets from "./src/modules/socket/socket.controller.js";
+import { socketListener } from "./src/modules/socket/socket-handler/socket-listener.js";
 //cron jobs
 import "./src/scheduler/cron_runner.js";
 
@@ -15,4 +16,6 @@ const httpServer = app.listen(port, () => {
 });
 
 //init socket
-setupSockets(httpServer, app);
+const io = setupSockets(httpServer);
+io.on("connection", socketListener);
+export const ioGetter = () => io;

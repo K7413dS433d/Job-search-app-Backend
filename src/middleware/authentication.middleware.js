@@ -16,6 +16,11 @@ export const isAuthenticated = (bearerKey = process.env.USER_BEARER) => {
     const authUser = await models.User.findById(decodedToken.id);
     if (!authUser) return next(new Error("Unauthorized", { cause: 401 }));
 
+    if (authUser.bannedAt)
+      return next(
+        new Error("You are banned try to contact admin", { cause: 403 })
+      );
+
     if (authUser.deletedAt)
       return next(
         new Error("freezed account login to un freeze", { cause: 401 })

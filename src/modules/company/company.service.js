@@ -17,7 +17,9 @@ export const addCompany = async (req, res, next) => {
   });
 
   if (companyExist)
-    return next(new Error("Company name or email already exist"));
+    return next(
+      new Error("Company name or email already exist", { cause: 400 })
+    );
 
   //create in company
   const newCompany = new models.Company({
@@ -67,6 +69,16 @@ export const updateCompany = async (req, res, next) => {
 
   if (companyExist.createdBy.toString() != authUser.id)
     return next(new Error("You are not the owner", { cause: 401 }));
+
+  // check if email and name exist before
+  const isUniqueData = await models.Company.findOne({
+    $or: [{ companyName }, { companyEmail }],
+  });
+
+  if (!isUniqueData)
+    return next(
+      new Error("Company name or email already exist", { cause: 400 })
+    );
 
   if (companyEmail) companyExist.companyEmail = companyEmail;
   if (companyName) companyExist.companyName = companyName;

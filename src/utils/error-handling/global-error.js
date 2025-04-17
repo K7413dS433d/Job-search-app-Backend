@@ -8,9 +8,9 @@ export const globalError = async (err, req, res, next) => {
     await deleteCloudDir({ assetsArray: publicIds });
   } else if (req.images) await deleteFile(req.images.public_id);
 
-  return res.status(err.status || 500).json({
+  return res.status(err.cause || 500).json({
     message: err.message,
-    status: err.status || 500,
+    status: err.cause || 500,
     stack: err.stack,
   });
 };

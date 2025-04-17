@@ -1,23 +1,29 @@
 import fs from "node:fs";
 import models from "./../../database/models/index.models.js";
 import * as utils from "./../../utils/index.utils.js";
+import { ioGetter } from "../../../index.js";
 
 //add job
 export const addJob = async (req, res, next) => {
   const { authUser } = req;
   const { companyId } = req.body;
-
   //check company exist
   const companyExist = await models.Company.findById(companyId);
   if (!companyExist)
     return next(new Error("Company not found", { cause: 404 }));
+
+  //check company is approved or no
+  if (!companyExist.approvedByAdmin)
+    return next(new Error("Company is not approved"), { cause: 401 });
 
   //check if hr or company owner
   const isHr = companyExist.HRs.includes(authUser.id);
   const isCompanyOwner = companyExist.createdBy === authUser.id;
 
   if (!isHr && !isCompanyOwner)
-    return next(new Error("unable to upload this job", { cause: 401 }));
+    return next(
+      new Error("Only Company owner or hr can add this job", { cause: 401 })
+    );
 
   //create job
   const newJob = await models.Job.create({
@@ -226,8 +232,8 @@ export const getAllApplications = async (req, res, next) => {
 export const applyForJob = async (req, res, next) => {
   const { id: userId } = req.authUser;
   const { jobId } = req.params;
-  const { io } = req.app.locals;
 
+  //check job is exist
   const job = await models.Job.findById(jobId).populate({
     path: "companyId",
     select: "HRs",
@@ -238,10 +244,17 @@ export const applyForJob = async (req, res, next) => {
   if (job.closed)
     return next(new Error("Application already closed", { cause: 400 }));
 
+  //check if applied before
+  const isApplied = await models.Application.findOne({ jobId: job.id, userId });
+
+  if (isApplied)
+    return next(new Error("You Applied to this job before", { cause: 409 }));
+
   //resolve path
   const folder = utils.pathResolver({
     path: `users/${userId}/jobApplications/${jobId}`,
   });
+
   //upload file
   const cv = await utils.uploadFile({
     req,
@@ -260,10 +273,12 @@ export const applyForJob = async (req, res, next) => {
 
   //send notification
   const companyHRs = job.companyId.HRs.map((hr) => hr.toString());
-  io.to(companyHRs).emit(
-    "application_submitted",
-    `${req.authUser.username} submit ${job.jobTitle} application`
-  );
+  ioGetter()
+    .to(companyHRs)
+    .emit(
+      "application_submitted",
+      `${req.authUser.username} submit ${job.jobTitle} application`
+    );
 
   return res
     .status(200)
@@ -306,17 +321,29 @@ export const acceptApplication = async (req, res, next) => {
 //application sheet
 export const exportApplications = async (req, res, next) => {
   const { companyId } = req.params;
-  const { createdAt } = req.query;
+  const { createdAt: date } = req.query;
+
+  //solve issue date is subtracted by one
+  let createdAt = new Date(date);
+  createdAt = createdAt.setDate(createdAt.getDate() + 1);
 
   //query
   const companyExist = await models.Company.findById(companyId).populate({
     path: "relatedJobs",
     populate: {
       path: "relatedApplications",
-      match: { createdAt: new Date(createdAt) },
+      match: {
+        createdAt: {
+          $gte: new Date(createdAt).setUTCHours(0, 0, 0, 0),
+          $lt: new Date(createdAt).setUTCHours(23, 59, 59, 999),
+        },
+      },
       populate: { path: "userId", select: "username firstName lastName -_id" },
     },
   });
+
+  if (!companyExist)
+    return next(new Error("Company not exist", { cause: 404 }));
 
   let applications = companyExist.relatedJobs.flatMap((job) =>
     job.relatedApplications.map((app) => ({

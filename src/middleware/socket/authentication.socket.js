@@ -22,8 +22,12 @@ export const socketIsAuthenticated = (bearerKey = process.env.USER_BEARER) => {
           new Error("freezed account login to un freeze", { cause: 401 })
         );
 
+      if (authUser.bannedAt)
+        return next(
+          new Error("You are banned try to contact admin", { cause: 403 })
+        );
+
       socket.authUser = authUser;
-      socket.join(authUser.id);
       socket.id = authUser.id;
 
       return next();
